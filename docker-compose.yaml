@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # Site 1 web containerları
+  web1:
+    image: php:7.4-apache
+    container_name: web1
+    volumes:
+      - /home/web/site1:/var/www/html/
+    networks:
+      - webnet
+
+  web2:
+    image: php:7.4-apache
+    container_name: web2
+    volumes:
+      - /home/web/site1:/var/www/html/
+    networks:
+      - webnet
+
+  # Site 2 web containerları
+  web3:
+    image: php:7.4-apache
+    container_name: web3
+    volumes:
+      - /home/web/site2:/var/www/html/
+    networks:
+      - webnet
+
+  web4:
+    image: php:7.4-apache
+    container_name: web4
+    volumes:
+      - /home/web/site2:/var/www/html/
+    networks:
+      - webnet
+
+networks:
+  webnet:
+    driver: bridge

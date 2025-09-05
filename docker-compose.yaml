@@ -35,6 +35,20 @@ services:
     networks:
       - webnet
 
+  # HAProxy
+  haproxy:
+    image: haproxy:2.3
+    container_name: haproxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /etc/letsencrypt/live/domain.com/haproxy.pem:/etc/letsencrypt/live/domain.com/haproxy.pem:ro
+      - /etc/letsencrypt/live/domain2.com/haproxy.pem:/etc/letsencrypt/live/domain2.com/haproxy.pem:ro
+    networks:
+      - webnet
+
 networks:
   webnet:
     driver: bridge

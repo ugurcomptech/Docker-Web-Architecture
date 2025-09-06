@@ -1,28 +1,29 @@
 # Docker Clustered Web Architecture
 
-Bu proje, bir veya birden fazla web sitesini yük dengeleme ile çalışan Docker ve HAProxy mimarisi üzerinde barındırmak için tasarlanmıştır. Her site bir veya daha fazla PHP-Apache konteyneri kullanabilir ve HAProxy frontend üzerinden istekleri yönlendirir. Bu yapı sayesinde yüksek erişilebilirlik, kolay ölçeklenebilirlik ve merkezi SSL yönetimi sağlanır.
+Bu proje, bir veya birden fazla web sitesini **Docker ve HAProxy tabanlı yük dengeleme mimarisi** ile çalıştırmak için tasarlanmıştır. Her site bir veya birden fazla PHP-Apache konteyneri ile çalışabilir ve HAProxy frontend üzerinden istekleri yönlendirir. Bu yapı sayesinde **yüksek erişilebilirlik, kolay ölçeklenebilirlik ve merkezi SSL yönetimi** sağlanır.
 
 ---
 
 ## İçerik
 
-- Bir veya birden fazla siteyi barındırabilir (`domain.com`, `domain2.com`, vb.)
-- HAProxy ile HTTP/HTTPS load balancing
-- Round-robin veya diğer load balancing algoritmaları
-- SSL sertifikaları ile merkezi HTTPS desteği
-- Docker Compose ile kolay kurulum ve yönetim
-- Web containerlarının sağlık kontrolü (`check`) ile yüksek erişilebilirlik
-- Merkezileştirilmiş loglama ve monitoring imkanı
+- Bir veya birden fazla siteyi barındırabilir (`domain.com`, `domain2.com` vb.)  
+- HAProxy ile HTTP/HTTPS load balancing  
+- Round-robin veya diğer load balancing algoritmaları  
+- SSL sertifikaları ile merkezi HTTPS desteği  
+- Docker Compose ile kolay kurulum ve yönetim  
+- Web containerlarının sağlık kontrolü (`healthcheck`) ile yüksek erişilebilirlik  
+- Merkezi loglama ve monitoring imkanı  
+- Replica ve deploy ile konteyner ölçeklendirme  
 
 ---
 
 ## Gereksinimler
 
-- Docker >= 20.10
-- Docker Compose >= 1.29
-- HAProxy >= 2.5
-- PHP-Apache image (tercihe bağlı sürüm)
-- Let's Encrypt sertifikaları
+- Docker >= 20.10  
+- Docker Compose >= 1.29  
+- HAProxy >= 2.5  
+- PHP-Apache image (tercihe bağlı sürüm)  
+- Let's Encrypt sertifikaları  
 
 ---
 
@@ -37,7 +38,7 @@ cd docker-web-architecture
 
 2. Web dosyalarını yerleştirin:
 
-- Örnek: `/home/web/site1`, `/home/web/site2` vb.
+- Örnek: `/home/web/site1`, `/home/web/site2`  
 - Her site kendi klasörü altında bağımsız olarak yönetilebilir.
 
 3. HAProxy SSL sertifikalarını `/etc/letsencrypt/live/` dizinine yerleştirin ve `haproxy.pem` olarak birleştirin:
@@ -53,67 +54,74 @@ cat fullchain.pem privkey.pem > /etc/letsencrypt/live/domain2.com/haproxy.pem
 docker-compose up -d
 ```
 
-5. HAProxy container'ını başlatın (ayrı bir container veya host üzerinde):
+---
 
-```bash
-haproxy -f /haproxy/haproxy.cfg
+## Docker Compose Özellikleri
+
+- **Deploy & Replicas:** Her site için birden fazla PHP-Apache konteyneri çalıştırabilirsiniz. Örneğin:
+
+```yaml
+deploy:
+  replicas: 4
 ```
+
+- **Healthcheck:** Konteynerların çalışıp çalışmadığını HAProxy’ye bildirir ve arızalı containerları devre dışı bırakır:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost/"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 20s
+```
+
+- **Ortak Konfigürasyon (Anchor):** Tekrar eden PHP-Apache ayarları `x-php-common` ile tanımlanır ve her site container’ında kullanılır:
+
+```yaml
+x-php-common: &php-common
+  image: php:8.2-apache
+  mem_limit: 512m
+  cpus: 0.5
+  environment:
+    PHP_OPCACHE_ENABLE: 1
+    ...
+```
+
+- **Loglama:** JSON formatında merkezi loglama ve dosya boyutu sınırı (`max-size`) ile log yönetimi  
 
 ---
 
 ## HAProxy Yapılandırması
 
-- **Frontend:**
-  - HTTP ve HTTPS isteklerini dinler
-  - Domain bazlı ACL ile hangi backend'e yönlendirileceğini belirler
-- **Backend:**
-  - Round-robin load balancing ile yükü konteynerlar arasında dağıtır
-  - Web containerlarının durumunu kontrol eder (`check`) ve arızalı containerları devre dışı bırakır
-- **SSL Termination:** HAProxy frontend üzerinden merkezi SSL yönetimi sağlar
-- **Loglama:** Syslog üzerinden container ve istek logları toplanabilir
-
-> İstediğiniz kadar backend ekleyerek yeni siteler yayınlayabilirsiniz.
+- **Frontend:** HTTP ve HTTPS isteklerini dinler, domain bazlı ACL ile backend’e yönlendirir  
+- **Backend:** Replica konteynerları arasında round-robin ile yük dağıtır  
+- **SSL Termination:** Frontend üzerinde SSL yönetimi sağlar  
+- **Loglama:** Syslog üzerinden container ve istek logları toplanabilir  
 
 ---
 
-## Docker Compose Servisleri
-
-- Her site için bir veya daha fazla PHP-Apache konteyneri oluşturabilirsiniz
-- Konteynerlar `webnet` ağı üzerinden iletişim kurar
-- Containerlar bağımsız olarak ölçeklenebilir ve güncellenebilir
-- Healthcheck ile HAProxy backend’e otomatik olarak yansır
-
----
-
-## Mimari
+## Mimari (Replica Uyumlu)
 
 ```mermaid
 flowchart TD
     A[Internet] -->|HTTPS/HTTP| B[HAProxy Frontend]
+
     B -->|domain.com| C[Site 1 Backend]
+    C --> site1_1[Site1 Replica 1: PHP-Apache]
+    C --> site1_2[Site1 Replica 2: PHP-Apache]
+    C --> site1_3[Site1 Replica 3: PHP-Apache]
+    C --> site1_4[Site1 Replica 4: PHP-Apache]
+
     B -->|domain2.com| D[Site 2 Backend]
-    B -->|...| E[Ekstra Site Backend]
-
-    C --> web1[Web1: PHP-Apache]
-    C --> web2[Web2: PHP-Apache]
-
-    D --> web3[Web3: PHP-Apache]
-    D --> web4[Web4: PHP-Apache]
-
-    E --> web5[Web5: PHP-Apache]
-    E --> web6[Web6: PHP-Apache]
+    D --> site2_1[Site2 Replica 1: PHP-Apache]
+    D --> site2_2[Site2 Replica 2: PHP-Apache]
+    D --> site2_3[Site2 Replica 3: PHP-Apache]
+    D --> site2_4[Site2 Replica 4: PHP-Apache]
 ```
 
----
-
-## Teknik Detaylar
-
-- HAProxy `frontend` ve `backend` ACL ile domain bazlı yönlendirme sağlar
-- SSL termination ile HTTPS trafiği yönetilir ve backend üzerinde HTTP kullanılır
-- PHP-Apache konteynerları volume ile host üzerinde yönetilen dosyalara bağlanır
-- Round-robin load balancing ile eşit dağılım sağlanır, isteğe göre `leastconn` gibi algoritmalar da uygulanabilir
-- Healthcheck sayesinde bir konteyner çökerse HAProxy otomatik olarak devre dışı bırakır
-- Network bridge ile konteynerler izole ama iletişim halinde çalışır
+- Her backend, Docker Compose deploy’da tanımlanan **replica sayısı** kadar PHP-Apache konteynerine sahiptir.  
+- HAProxy, **healthcheck** ile arızalı replica’ları otomatik olarak devre dışı bırakır.  
 
 ---
 
@@ -139,10 +147,8 @@ docker-compose logs -f
 ```
 
 - Yeni bir site eklemek için:
-  1. Web dosyalarını yerleştirin
-  2. Docker Compose servisini oluşturun
-  3. HAProxy backend ve ACL ekleyin
-
----
-
+  1. Web dosyalarını yerleştirin  
+  2. Docker Compose servisini oluşturun  
+  3. HAProxy backend ve ACL ekleyin  
+  4. Gerekirse deploy replicas sayısını artırın
 

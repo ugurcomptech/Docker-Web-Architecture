@@ -1,4 +1,4 @@
-# Docker Clustered Web Architecture (Güncellenmiş)
+# Docker Clustered Web Architecture
 
 Bu proje, bir veya birden fazla web sitesini **Docker ve HAProxy tabanlı yük dengeleme mimarisi** ile çalıştırmak için tasarlanmıştır. Her site bir veya birden fazla PHP-Apache konteyneri ile çalışabilir ve HAProxy frontend üzerinden istekleri yönlendirir. Bu yapı sayesinde **yüksek erişilebilirlik, kolay ölçeklenebilirlik, merkezi SSL yönetimi ve özelleştirilebilir PHP ayarları** sağlanır.
 

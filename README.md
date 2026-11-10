@@ -51,6 +51,7 @@ nano php-config/site1/php.ini  # site1 için PHP ayarları
 nano php-config/site2/php.ini  # site2 için PHP ayarları
 ```
 
+
 Örnek php.ini içeriği:
 
 ```ini
